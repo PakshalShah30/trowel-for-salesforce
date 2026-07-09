@@ -1,0 +1,7 @@
+anthropic>=0.40
+networkx>=3.3
+sentence-transformers>=3.0   # local embeddings; swap for API embeddings later
+jinja2>=3.1
+pytest>=8.0
+python-dotenv>=1.0
+rich>=13.0                   # pretty CLI output
