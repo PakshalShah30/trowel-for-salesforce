@@ -1,0 +1,21 @@
+# Secrets — never commit
+.env
+
+# Python
+.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+
+# Salesforce CLI local state
+.sfdx/
+.sf/
+
+# OS / editor
+.DS_Store
+.vscode/
+
+# Local data (regenerate via excavate)
+dig-site-sample/
+*.db
+reports/*.html
