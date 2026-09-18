@@ -1,4 +1,3 @@
-<<<<<<< HEAD
 # Trowel — for Salesforce
 
 **AI-powered Well-Architected assessments for Salesforce orgs.** Trowel excavates an org — mapping every Flow, Apex class, field, and permission — and produces the assessment a consultancy would charge $50k for.
@@ -27,7 +26,9 @@ Point it at any org. It tells you what the org *actually does*, where the tech d
 
 ## Status
 
-🚧 In progress — see [ROADMAP.md](ROADMAP.md) for the 8-week build plan and [docs/FRAMEWORK.md](docs/FRAMEWORK.md) for architecture decisions.
+Early and paused. The metadata retrieval pipeline works against a live Developer Edition org, and a test org is seeded with deliberate tech debt (dead Flows, a trigger and Flow competing for one field, unused fields, an over-permissioned permission set). The parser, dependency graph, and eval suite are not written yet.
+
+See [ROADMAP.md](ROADMAP.md) for the build plan and [docs/FRAMEWORK.md](docs/FRAMEWORK.md) for the architecture decisions, which are the part worth reading today.
 
 ## Quick start
 
@@ -54,6 +55,3 @@ flowchart LR
   H --> I[HTML report + remediation roadmap]
   G -.->|eval gate| J[Golden dataset + LLM-as-judge]
 ```
-=======
-# trowel-for-salesforce
->>>>>>> 44d9eacf12b9cbf6397719ecaf516320c867dc23
