@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 # Trowel — for Salesforce
 
 **AI-powered Well-Architected assessments for Salesforce orgs.** Trowel excavates an org — mapping every Flow, Apex class, field, and permission — and produces the assessment a consultancy would charge $50k for.
@@ -53,3 +54,6 @@ flowchart LR
   H --> I[HTML report + remediation roadmap]
   G -.->|eval gate| J[Golden dataset + LLM-as-judge]
 ```
+=======
+# trowel-for-salesforce
+>>>>>>> 44d9eacf12b9cbf6397719ecaf516320c867dc23
