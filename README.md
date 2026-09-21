@@ -6,7 +6,7 @@
 
 Point it at any org. It tells you what the org *actually does*, where the tech debt is buried, which automations fight each other, and what to fix first.
 
-> Built by [Pakshal Shah](https://linkedin.com/in/pakshalshah30) — Technical Program Manager & 6x-certified Salesforce Architect — as a working answer to the question: *what does agentic AI look like inside a governed enterprise platform?*
+> Built by [Pakshal Shah](https://linkedin.com/in/pakshalshah30) — Senior Business Analyst & 7x-certified Salesforce specialist — as a working answer to the question: *what does agentic AI look like inside a governed enterprise platform?*
 >
 > Internal codename: `archaeologist` (you'll see it in the Python module names — the dig-site metaphor runs all the way down).
 
@@ -26,20 +26,67 @@ Point it at any org. It tells you what the org *actually does*, where the tech d
 
 ## Status
 
-Early and paused. The metadata retrieval pipeline works against a live Developer Edition org, and a test org is seeded with deliberate tech debt (dead Flows, a trigger and Flow competing for one field, unused fields, an over-permissioned permission set). The parser, dependency graph, and eval suite are not written yet.
+**Weeks 1–3 shipped.** The pipeline runs end to end on bundled fixtures with no
+Salesforce org required:
 
-See [ROADMAP.md](ROADMAP.md) for the build plan and [docs/FRAMEWORK.md](docs/FRAMEWORK.md) for the architecture decisions, which are the part worth reading today.
+| Stage | State |
+|---|---|
+| Excavate — metadata retrieval via `sf` CLI | working against a live Dev Edition org |
+| Summarize — one Flow → structured JSON, forced tool-use | working |
+| **Catalog** — XML → SQLite inventory | **working** |
+| **Dependency graph** — networkx, transitive impact queries | **working** |
+| **Detectors** — TRW001 dead automation, TRW002 unreferenced field | **working, 23 tests** |
+| Embeddings + hybrid retrieval | not started |
+| Agent loop | not started |
+| Eval suite (golden dataset + LLM-as-judge) | not started |
+| HTML assessment report | not started |
+
+Findings are produced by deterministic code, not by a model — see
+[the reasoning](src/archaeologist/detectors.py). The model's job begins after
+the findings exist.
 
 ## Quick start
 
+No org, no API key, no Salesforce CLI — the repo ships a sample metadata tree
+with tech debt deliberately planted in it:
+
 ```bash
-# Prereqs: Python 3.11+, Salesforce CLI (sf), a Dev Edition org, ANTHROPIC_API_KEY
-pip install -r requirements.txt
-cp .env.example .env          # add your API key
-sf org login web -a dig-site  # authenticate your target org
-python -m archaeologist.excavate --org dig-site   # pull metadata
-python -m archaeologist.summarize --flow MyFlow   # phase 1: explain one Flow
+pip install networkx rich pytest
+export PYTHONPATH=src
+
+python -m archaeologist.cli catalog fixtures/dig-site
+python -m archaeologist.cli stats
+python -m archaeologist.cli detect            # exits 1 — there are findings
+python -m archaeologist.cli impact field:Lead.Score__c
 ```
+
+`detect` exits non-zero on anything above `info`, so it can gate a deployment
+the way a linter gates a pull request.
+
+### Against a real org
+
+```bash
+pip install -r requirements.txt
+cp .env.example .env               # add ANTHROPIC_API_KEY
+sf org login web -a dig-site
+python -m archaeologist.excavate --org dig-site
+python -m archaeologist.cli catalog dig-site-sample
+python -m archaeologist.cli detect
+```
+
+### The fixture tree
+
+Each file exists to disprove a different naive implementation:
+
+| Fixture | Proves |
+|---|---|
+| `Lead_Assignment` | record-triggered Flows have zero inbound references and are **not** dead |
+| `Shared_Utility` | subflow calls count as references |
+| `Apex_Invoked_Flow` | Apex callers count too — skip Apex parsing and this looks dead |
+| `Orphan_Notifier` | the one genuine finding (TRW001) |
+| `Retired_Cleanup` | Draft ≠ debt |
+| `Case_Intake` | screen Flows launch from outside retrieved metadata, so absence proves nothing |
+| `LeadService.cls` | a `Flow.Interview` call inside a comment is not a reference |
 
 ## Architecture
 

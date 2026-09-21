@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Flow xmlns="http://soap.sforce.com/2006/04/metadata">
+    <apiVersion>62.0</apiVersion>
+    <label>Lead Assignment</label>
+    <processType>AutoLaunchedFlow</processType>
+    <status>Active</status>
+    <start>
+        <object>Lead</object>
+        <triggerType>RecordAfterSave</triggerType>
+        <recordTriggerType>CreateAndUpdate</recordTriggerType>
+    </start>
+    <recordUpdates>
+        <name>Set_Score</name>
+        <object>Lead</object>
+        <inputAssignments>
+            <field>Score__c</field>
+            <value><numberValue>10.0</numberValue></value>
+        </inputAssignments>
+    </recordUpdates>
+    <subflows>
+        <name>Call_Shared_Utility</name>
+        <flowName>Shared_Utility</flowName>
+    </subflows>
+</Flow>

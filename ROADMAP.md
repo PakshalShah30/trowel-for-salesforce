@@ -6,19 +6,19 @@ Every week ends with a **shippable increment** — commit it, even if rough. Eig
 
 ---
 
-## Week 1 — Dig site setup & metadata fundamentals (5–6 h)
+## Week 1 — Dig site setup & metadata fundamentals (5–6 h) — ✅ SHIPPED
 **Build:** Free Developer Edition org + `sf` CLI auth. Run `scripts/seed_dig_site.py` ideas manually for now: create 2 dead Flows, a trigger + record-triggered Flow that both update the same Lead field, 5 unused custom fields. Retrieve everything with `sf project retrieve start`. Open the XML. Read it.
 **Learn (the why):** Metadata API vs Tooling API — what each can and can't see (FRAMEWORK §2). Why read-only posture is a product feature.
 **Ship:** repo initialized, org connected, raw metadata committed to `/dig-site-sample`.
 **Checkpoint question you should be able to answer:** *"Why can't this tool be a managed package inside the org?"*
 
-## Week 2 — First LLM contact: explain one Flow (6–8 h)
+## Week 2 — First LLM contact: explain one Flow (6–8 h) — ✅ SHIPPED
 **Build:** `archaeologist/summarize.py` — feed one Flow's XML to Claude, get back a structured JSON summary (purpose, objects touched, fields written, trigger conditions). Use a JSON schema / tool-use forced output, not "please respond in JSON."
 **Learn:** Prompt engineering with structured output — why schema-forced output beats prose parsing (determinism, testability). Temperature and why 0 for analysis. Token costs: measure what one Flow costs; extrapolate to an org.
 **Ship:** CLI command that explains any Flow in the org.
 **Checkpoint:** *"Why structured output instead of asking for markdown?"*
 
-## Week 3 — Catalog & dependency graph (6–8 h)
+## Week 3 — Catalog & dependency graph (6–8 h) — ✅ SHIPPED
 **Build:** Parser walks all retrieved XML → SQLite tables (artifacts, fields, references). Build the networkx graph: nodes = artifacts/fields, edges = references. First deterministic detector: dead automation (zero inbound refs).
 **Learn:** Why a graph and not just SQL joins (transitive dependencies: "what breaks if I delete this field?" is a graph traversal). Why deterministic detection before any LLM involvement (FRAMEWORK §7).
 **Ship:** `excavate` + `catalog` commands; graph queryable; first real finding printed.

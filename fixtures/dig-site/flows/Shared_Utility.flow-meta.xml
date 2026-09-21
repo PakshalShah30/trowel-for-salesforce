@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Flow xmlns="http://soap.sforce.com/2006/04/metadata">
+    <apiVersion>62.0</apiVersion>
+    <label>Shared Utility</label>
+    <processType>AutoLaunchedFlow</processType>
+    <status>Active</status>
+    <recordLookups>
+        <name>Get_Lead</name>
+        <object>Lead</object>
+        <filters>
+            <field>Score__c</field>
+            <operator>GreaterThan</operator>
+        </filters>
+    </recordLookups>
+</Flow>

@@ -1,0 +1,29 @@
+name: tests
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  pytest:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - run: pip install networkx rich pytest
+      - run: pytest -q
+
+      # The detectors must actually fire on the bundled fixtures. A green test
+      # suite against a tree with no findings would prove nothing, so CI also
+      # asserts the pipeline produces the two findings we planted.
+      - name: detect on fixtures
+        run: |
+          export PYTHONPATH=src
+          python -m archaeologist.cli --db /tmp/ci.db catalog fixtures/dig-site
+          python -m archaeologist.cli --db /tmp/ci.db detect && \
+            { echo "expected a non-zero exit from a tree with a planted finding"; exit 1; } || true
+          python -m archaeologist.cli --db /tmp/ci.db detect | grep -q TRW001
+          python -m archaeologist.cli --db /tmp/ci.db detect | grep -q TRW002
