@@ -30,7 +30,7 @@ Every week ends with a **shippable increment** — commit it, even if rough. Eig
 **Ship:** working Q&A over the org.
 **Checkpoint:** *"When would pure vector RAG give a wrong answer here that hybrid gets right?"*
 
-## Week 5 — Evals (the week that separates you from every demo-builder) (6–8 h)
+## Week 5 — Evals (the week that separates you from every demo-builder) (6–8 h) — ✅ SHIPPED
 **Build:** `evals/golden/` — 30 hand-verified Q→A pairs about your dig site. Tier 1 pytest: deterministic findings must match exactly. Tier 2: LLM-as-judge with a written rubric scoring narrative answers 1–5. GitHub Action running it all on PR.
 **Learn:** Why evals mid-project, not last; why facts get deterministic checks and prose gets a judge; judge calibration (spot-check 10 judgments by hand, record agreement rate).
 **Ship:** failing-able CI. Deliberately break a prompt and watch the eval catch it — screenshot that; it's a LinkedIn post.

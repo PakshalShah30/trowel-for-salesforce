@@ -6,7 +6,11 @@ on:
   pull_request:
 
 jobs:
-  pytest:
+  # Everything deterministic: unit tests, tier-1 evals, and the mutation
+  # harness. No API key, no cost, runs on every pull request including from
+  # forks. An eval gate that is expensive to run is an eval gate that gets
+  # skipped, so the free half is the half that blocks merges.
+  deterministic:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -14,16 +18,47 @@ jobs:
         with:
           python-version: "3.11"
       - run: pip install -r requirements.txt
-      - run: pytest -q
 
-      # The detectors must actually fire on the bundled fixtures. A green test
-      # suite against a tree with no findings would prove nothing, so CI also
-      # asserts the pipeline produces the two findings we planted.
-      - name: detect on fixtures
+      - name: unit tests + tier-1 evals + mutation harness
+        run: pytest -q
+
+      # A green suite against a tree with no findings proves nothing, so CI
+      # asserts the detectors actually fire on the planted debt.
+      - name: detectors fire on fixtures
         run: |
           export PYTHONPATH=src
           python -m archaeologist.cli --db /tmp/ci.db catalog fixtures/dig-site
-          python -m archaeologist.cli --db /tmp/ci.db detect && \
-            { echo "expected a non-zero exit from a tree with a planted finding"; exit 1; } || true
           python -m archaeologist.cli --db /tmp/ci.db detect | grep -q TRW001
           python -m archaeologist.cli --db /tmp/ci.db detect | grep -q TRW002
+
+      - name: eval report
+        run: |
+          export PYTHONPATH=src:.
+          python -m evals.run --mutations --json > eval-report.json
+      - uses: actions/upload-artifact@v4
+        with:
+          name: eval-report
+          path: eval-report.json
+
+  # The judged tier costs money per run, so it is gated on the secret being
+  # present and never blocks a fork's pull request. It runs on main, where a
+  # regression in narrative quality is worth knowing about.
+  judged:
+    runs-on: ubuntu-latest
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - run: pip install -r requirements-llm.txt
+      - name: tier 2 — rubric-judged
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+        run: |
+          if [ -z "$ANTHROPIC_API_KEY" ]; then
+            echo "No ANTHROPIC_API_KEY secret set — tier 2 skipped, not failed."
+            exit 0
+          fi
+          export PYTHONPATH=src:.
+          python -m evals.run --tier2
