@@ -1,0 +1,7 @@
+# Everything that talks to a model (weeks 2, 4-8). Installed separately so the
+# deterministic half of the tool stays cheap to run and cheap to CI.
+-r requirements.txt
+anthropic>=0.40
+python-dotenv>=1.0
+sentence-transformers>=3.0   # local embeddings; swap for API embeddings later
+jinja2>=3.1                  # HTML assessment report (week 7)

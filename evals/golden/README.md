@@ -1,12 +1,16 @@
 # Golden dataset (Week 5)
 
-Hand-verified question → expected-answer pairs about the seeded dig-site org.
+Hand-verified question → expected-answer pairs about the dig site.
+
+Tier 1 cases must agree with what `detectors.run_all` already returns for
+`fixtures/dig-site` — the deterministic half is the reference answer, not a
+second opinion on it.
 
 Format (`cases.jsonl`, one per line):
 
 ```json
-{"id": "dead-flow-01", "tier": 1, "question": "List all Flows with zero inbound references and zero runtime interviews", "expected": ["Old_Lead_Router", "Legacy_Discount_Calc"]}
-{"id": "narrative-01", "tier": 2, "question": "Explain what happens when a Lead is converted", "rubric": "Must mention: trigger X fires, Flow Y updates Lead.Status, field mapping to Opportunity. Score 1-5 on accuracy, completeness, actionability."}
+{"id": "dead-flow-01", "tier": 1, "question": "List every Active autolaunched Flow that nothing invokes", "expected": ["Orphan_Notifier"]}
+{"id": "narrative-01", "tier": 2, "question": "Explain what happens when a Lead is created or updated", "rubric": "Must mention: LeadTrigger fires, Lead_Assignment writes Lead.Score__c, Shared_Utility runs as a subflow. Score 1-5 on accuracy, completeness, actionability."}
 ```
 
 Rules:

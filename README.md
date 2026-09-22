@@ -51,7 +51,7 @@ No org, no API key, no Salesforce CLI — the repo ships a sample metadata tree
 with tech debt deliberately planted in it:
 
 ```bash
-pip install networkx rich pytest
+pip install -r requirements.txt     # 3 packages, no model deps
 export PYTHONPATH=src
 
 python -m archaeologist.cli catalog fixtures/dig-site
@@ -66,7 +66,7 @@ the way a linter gates a pull request.
 ### Against a real org
 
 ```bash
-pip install -r requirements.txt
+pip install -r requirements-llm.txt
 cp .env.example .env               # add ANTHROPIC_API_KEY
 sf org login web -a dig-site
 python -m archaeologist.excavate --org dig-site
@@ -102,3 +102,7 @@ flowchart LR
   H --> I[HTML report + remediation roadmap]
   G -.->|eval gate| J[Golden dataset + LLM-as-judge]
 ```
+
+## License
+
+MIT — see [LICENSE](LICENSE).
