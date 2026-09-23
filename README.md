@@ -26,7 +26,7 @@ Point it at any org. It tells you what the org *actually does*, where the tech d
 
 ## Status
 
-**Weeks 1–3 and 5 shipped.** The pipeline runs end to end on bundled fixtures with no
+**Weeks 1–5 shipped.** The pipeline runs end to end on bundled fixtures with no
 Salesforce org required:
 
 | Stage | State |
@@ -36,8 +36,8 @@ Salesforce org required:
 | **Catalog** — XML → SQLite inventory | **working** |
 | **Dependency graph** — networkx, transitive impact queries | **working** |
 | **Detectors** — TRW001 dead automation, TRW002 unreferenced field | **working** |
-| **Eval suite** — golden dataset, two tiers, mutation-tested | **working, 32 tests** |
-| Embeddings + hybrid retrieval | not started |
+| **Eval suite** — golden dataset, two tiers, mutation-tested | **working, 67 tests** |
+| **Embeddings + hybrid retrieval** — artifact cards, TF-IDF, graph walk, RRF | **working** |
 | Agent loop | not started |
 | HTML assessment report | not started |
 
@@ -58,10 +58,54 @@ python -m archaeologist.cli catalog fixtures/dig-site
 python -m archaeologist.cli stats
 python -m archaeologist.cli detect            # exits 1 — there are findings
 python -m archaeologist.cli impact field:Lead.Score__c
+python -m archaeologist.cli ask "what depends on Score__c?"
 ```
 
 `detect` exits non-zero on anything above `info`, so it can gate a deployment
-the way a linter gates a pull request.
+the way a linter gates a pull request. `ask` prints the ranked context a model
+would be given, and why each item is there. It calls no model. Add `--cards` to
+see the text each artifact was matched on.
+
+## Retrieval
+
+Questions are answered from two retrieval paths, fused:
+
+- **Graph.** Artifact names in the question (`Score__c`, `Lead_Assignment`,
+  `Leads`) are matched against the catalog, then the dependency graph is walked
+  up to two hops from each one.
+- **Vector.** Every artifact has a *card*: a plain-English description rendered
+  from the catalog and graph by code, not by a model. Cards are ranked by
+  similarity to the question.
+
+The two ranked lists are merged with Reciprocal Rank Fusion, which uses ranks
+only. A hop count and a cosine score have no common unit, so any formula that
+adds them is a guess. Artifacts named in the question are pinned first.
+
+**Why not pure vector RAG?** Ask *"what depends on Score__c?"* Three Flows read
+or write the field and their cards say so; any vector index finds them. But
+`LeadService` launches `Apex_Invoked_Flow`, which filters on Score__c, and
+LeadService's own card never mentions the field. It shares no words with the
+question, so pure vector retrieval doesn't return it at any cut-off. The graph
+walk finds it at two hops. The vector-only answer looks complete and misses
+exactly the second-order dependency that impact analysis is for.
+
+**Why not graph-only?** *"Is there a screen a user fills in to log a new
+case?"* names nothing in the catalog, so the graph walk has nowhere to start.
+The vector path matches `Case_Intake`, whose card describes it as a screen
+flow.
+
+Both claims are eval cases, and both are enforced by mutation: disabling the
+graph path breaks `retrieve-01`, and disabling the vector path breaks
+`retrieve-03` and `retrieve-04`. (See the table below.)
+
+The default embedder is a pure-Python TF-IDF, so CI downloads no model and
+retrieval results are deterministic enough to assert on exactly. It matches
+words, not meaning: it won't connect "billing" to "invoice". That's a deliberate
+trade for cost and reproducibility, not a claim that it matches a neural model.
+`--embedder st` switches to a local sentence-transformer if
+`requirements-llm.txt` is installed. Nothing else changes. Rationale in
+[`embed.py`](src/archaeologist/embed.py) and
+[`retrieve.py`](src/archaeologist/retrieve.py).
 
 ## Evals
 
@@ -88,19 +132,21 @@ uncalibrated judge is an unmeasured instrument.
 
 **Mutation testing — who evaluates the evaluator?** A green eval suite proves
 nothing on its own; cases that assert something trivially true look exactly
-like cases that work. So five known-bad changes are applied on purpose, and
+like cases that work. So seven known-bad changes are applied on purpose, and
 each must break at least one case:
 
 | Mutation | Caught by |
 |---|---|
-| `drop-apex-references` | dead-flow-01, dead-flow-02, graph-02 |
+| `drop-apex-references` | dead-flow-01, dead-flow-02, graph-02, graph-04, retrieve-01, retrieve-05 |
 | `ignore-comments` | dead-flow-01, dead-flow-03 |
 | `processtype-only` | dead-flow-01 |
 | `collapse-edge-types` | dead-flow-01, dead-flow-02, dead-flow-04, graph-02, graph-03 |
 | `direct-dependencies-only` | dead-flow-01, dead-flow-04 |
+| `vector-only-retrieval` | retrieve-01 |
+| `graph-only-retrieval` | retrieve-03, retrieve-04 |
 
 A surviving mutation exits 2 and names the hole. This turns "we have evals"
-into "our evals catch these five named failures", which is the difference
+into "our evals catch these seven named failures", which is the difference
 between a claim and evidence.
 
 CI runs tier 1 and the mutation harness on every pull request for free; the
@@ -126,7 +172,7 @@ Each file exists to disprove a different naive implementation:
 |---|---|
 | `Lead_Assignment` | record-triggered Flows have zero inbound references and are **not** dead |
 | `Shared_Utility` | subflow calls count as references |
-| `Apex_Invoked_Flow` | Apex callers count too — skip Apex parsing and this looks dead |
+| `Apex_Invoked_Flow` | Apex callers count too — skip Apex parsing and this looks dead. It also filters on `Score__c`, which makes `LeadService` a two-hop dependent of that field sharing no words with it |
 | `Orphan_Notifier` | the one genuine finding (TRW001) |
 | `Retired_Cleanup` | Draft ≠ debt |
 | `Case_Intake` | screen Flows launch from outside retrieved metadata, so absence proves nothing |
@@ -139,7 +185,7 @@ flowchart LR
   A[Salesforce Org] -->|sf CLI: Metadata + Tooling API| B[Raw metadata XML/JSON]
   B --> C[Parser → SQLite catalog]
   C --> D[Dependency graph — networkx]
-  C --> E[Embeddings index]
+  C --> E[Artifact cards → embeddings]
   D & E --> F[Hybrid retriever]
   F --> G[Agent loop — Claude tool use]
   G --> H[Findings engine → Well-Architected scores]

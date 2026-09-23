@@ -12,7 +12,7 @@ suite has a hole at precisely that spot, and the fix is a new case rather than
 a shrug.
 
 This is mutation testing borrowed from unit-test practice and pointed at the
-eval suite. It converts "we have evals" into "our evals catch these five named
+eval suite. It converts "we have evals" into "our evals catch these named
 failures", which is the difference between a claim and evidence.
 
 Run it:  python -m evals.run --mutations
@@ -39,6 +39,7 @@ from typing import Callable, Iterator
 import networkx as nx
 
 from archaeologist import detectors, graph as graph_mod, parse
+from archaeologist import retrieve as retrieve_mod
 from archaeologist.models import Artifact, Edge
 
 from .tier1 import FIXTURES
@@ -119,6 +120,37 @@ def _direct_dependencies_only() -> Iterator[World]:
     yield artifacts, graph_mod.build(artifacts, kept)
 
 
+@contextmanager
+def _vector_only_retrieval() -> Iterator[World]:
+    """"Embed everything and take the top k. That's what RAG is."
+
+    Disables the graph path of the hybrid retriever. Like processtype-only it
+    patches behaviour rather than the world, so it has to stay applied until
+    the retrieve cases have actually run.
+    """
+    original = retrieve_mod._graph_candidates
+    retrieve_mod._graph_candidates = lambda *args, **kwargs: []  # type: ignore[assignment]
+    try:
+        yield _baseline()
+    finally:
+        retrieve_mod._graph_candidates = original  # type: ignore[assignment]
+
+
+@contextmanager
+def _graph_only_retrieval() -> Iterator[World]:
+    """"Metadata is structured. Embeddings are just a fuzzy extra."
+
+    Disables the vector path. A question that names nothing in the catalog
+    then has no starting node, and the graph walk returns nothing at all.
+    """
+    original = retrieve_mod._vector_candidates
+    retrieve_mod._vector_candidates = lambda *args, **kwargs: []  # type: ignore[assignment]
+    try:
+        yield _baseline()
+    finally:
+        retrieve_mod._vector_candidates = original  # type: ignore[assignment]
+
+
 MUTATIONS = [
     Mutation(
         "drop-apex-references", _drop_apex_references.__doc__ or "",
@@ -152,5 +184,19 @@ MUTATIONS = [
         "that calls the Flow that writes the field — is invisible, which is "
         "the entire reason anyone runs impact analysis.",
         _direct_dependencies_only,
+    ),
+    Mutation(
+        "vector-only-retrieval", _vector_only_retrieval.__doc__ or "",
+        "Asked what depends on a field, retrieval returns the artifacts that "
+        "mention it and misses the Apex that launches the Flow that reads it. "
+        "The answer looks complete and omits the second-order breakage.",
+        _vector_only_retrieval,
+    ),
+    Mutation(
+        "graph-only-retrieval", _graph_only_retrieval.__doc__ or "",
+        "Any question that describes behaviour instead of naming an artifact "
+        "(\"is there a screen for logging cases?\") gets an empty context, and "
+        "whatever answers it next is answering from nothing.",
+        _graph_only_retrieval,
     ),
 ]

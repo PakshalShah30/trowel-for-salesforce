@@ -24,7 +24,7 @@ Every week ends with a **shippable increment** — commit it, even if rough. Eig
 **Ship:** `excavate` + `catalog` commands; graph queryable; first real finding printed.
 **Checkpoint:** *"Why doesn't the LLM discover findings?"*
 
-## Week 4 — Embeddings & hybrid retrieval (6–8 h)
+## Week 4 — Embeddings & hybrid retrieval (6–8 h) — ✅ SHIPPED
 **Build:** Embed artifact summaries (from week 2's summarizer, batched) into a vector table. Build the hybrid retriever: graph for exact refs, embeddings for semantic. CLI Q&A: `ask "what happens when a Lead converts?"`.
 **Learn:** Embedding model choice (small local model vs API — cost/quality/privacy trade). Why hybrid beats pure RAG on structured data (FRAMEWORK §4) — write this one up properly; it's your best interview material.
 **Ship:** working Q&A over the org.

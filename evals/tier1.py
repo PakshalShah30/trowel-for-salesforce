@@ -12,6 +12,12 @@ both can be wrong in the same direction, and the score looks fine. It does not
 apply here, because the judge is never asked about facts. It is asked whether a
 piece of prose is a good explanation, which is a question about writing.
 
+Retrieval (Week 4) is tier 1 too. With the default TF-IDF embedder the
+ranking is a deterministic function of the catalog, so "is LeadService in the
+top 6 for this question" has one correct answer and gets a set check. With a
+neural embedder that would stop being true, which is one reason the default
+isn't neural (see ``archaeologist/embed.py``).
+
 The practical payoff: tier 1 needs no API key, so it runs on every pull request
 for free, in under a second. Cost is a design constraint on evals. An eval
 suite that is expensive to run is an eval suite that gets skipped.
@@ -26,6 +32,7 @@ from typing import Any
 import networkx as nx
 
 from archaeologist import detectors, graph as graph_mod, parse
+from archaeologist import retrieve as retrieve_mod
 from archaeologist.models import Artifact, Kind
 
 from .cases import Case
@@ -63,6 +70,11 @@ def answer(case: Case, artifacts: list[Artifact], graph: nx.MultiDiGraph) -> Any
         return graph_mod.inbound(graph, query["node"], edge=query.get("edge"))
     if op == "outbound":
         return graph_mod.outbound(graph, query["node"], edge=query.get("edge"))
+    if op == "retrieve":
+        # The case's own question is the retrieval input: it is literally the
+        # question a user would type.
+        hits = retrieve_mod.retrieve(artifacts, graph, case.question, k=query["k"])
+        return [h.artifact_id for h in hits]
     if op == "count":
         kind = Kind(query["kind"])
         return sum(

@@ -22,7 +22,7 @@ from typing import Any
 
 GOLDEN = Path(__file__).parent / "golden" / "cases.jsonl"
 
-_TIER1_OPS = {"detect", "impact", "inbound", "outbound", "count"}
+_TIER1_OPS = {"detect", "impact", "inbound", "outbound", "count", "retrieve"}
 
 
 @dataclass(frozen=True)
@@ -78,6 +78,8 @@ def _validate(case: Case, where: str) -> None:
             raise ValueError(f"{where}: tier-1 case {case.id!r} has no expected value")
         if case.match not in {"equals", "contains"}:
             raise ValueError(f"{where}: bad match mode {case.match!r}")
+        if op == "retrieve":
+            _validate_retrieve(case, where)
     elif case.tier == 2:
         if not case.target or not case.rubric:
             raise ValueError(f"{where}: tier-2 case {case.id!r} needs a target and a rubric")
@@ -85,3 +87,23 @@ def _validate(case: Case, where: str) -> None:
             raise ValueError(f"{where}: min_score out of range for {case.id!r}")
     else:
         raise ValueError(f"{where}: unknown tier {case.tier}")
+
+
+def _validate_retrieve(case: Case, where: str) -> None:
+    """A retrieve case asks ``case.question`` and checks the top ``k`` ids.
+
+    ``contains`` only: the promise is "these artifacts are in the context",
+    not an exact ordering of everything else, which would break on any
+    harmless change to the cards. And the expected list must fit inside
+    ``k``, or the case can never pass and would only ever look like a
+    regression.
+    """
+    k = (case.query or {}).get("k")
+    if not isinstance(k, int) or k < 1:
+        raise ValueError(f"{where}: retrieve case {case.id!r} needs a positive integer k")
+    if case.match != "contains":
+        raise ValueError(f"{where}: retrieve case {case.id!r} must use match 'contains'")
+    if not isinstance(case.expected, list) or not case.expected:
+        raise ValueError(f"{where}: retrieve case {case.id!r} needs a non-empty expected list")
+    if len(case.expected) > k:
+        raise ValueError(f"{where}: retrieve case {case.id!r} expects more ids than k={k}")

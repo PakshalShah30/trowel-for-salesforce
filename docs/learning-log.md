@@ -48,6 +48,80 @@ them could be the consumer. It's a shortlist for an admin's afternoon, not a
 verdict — and saying so in the finding is the difference between a tool people
 trust and one they mute.
 
+## Week 4 — hybrid retrieval, and a fixture that didn't say what I thought
+
+The checkpoint question was *"when would pure vector RAG give a wrong answer
+here that hybrid gets right?"* I wanted the answer to be an eval case, not a
+paragraph.
+
+1. **My go-to example was wrong, and the fixture showed it.** I'd been
+   saying "Shared_Utility is two hops from Score__c." It isn't. It filters on
+   Score__c directly, so it's one hop, and its card mentions the field by
+   name. graph-01's `guards` text said the same wrong thing, and in hindsight
+   the clue was already there: `direct-dependencies-only` never broke
+   graph-01. On the fixture as it was, pure vector retrieval found every
+   dependent of Score__c, so the checkpoint question had no honest answer
+   yet. The fix was to give the empty `Apex_Invoked_Flow` a lookup filtered
+   on Score__c. Now `LeadService → Apex_Invoked_Flow → Score__c` is a real
+   two-hop chain, and LeadService's card shares no words with *"what depends
+   on Score__c?"* Pure vector doesn't return it at any cut-off; the graph
+   walk does. That's `retrieve-01`, and the `vector-only-retrieval` mutation
+   breaks it. No flow or field counts changed and no expected answer
+   changed. I rewrote graph-01's guard text and added graph-04 for the real
+   multi-hop impact.
+
+2. **Embed cards, not XML and not summaries.** Raw Flow XML is mostly
+   boilerplate, so similarity between two Flows mostly measures how alike
+   their tags are. LLM summaries read better, but retrieval would then depend
+   on an API key, and results would shift every time a summary was
+   regenerated. A card is a few sentences rendered from the catalog and graph
+   by code. It's free, the same every run, and every claim on it traces back
+   to an edge. It also translates codes into the words people ask with:
+   `status=Draft` becomes "not active, so it does not run". One rule I cared
+   about: an Apex class card never says "nothing calls this", because the
+   parser doesn't see Apex-to-Apex calls. (LeadTrigger *does* call
+   LeadService.) A card that states an absence the parser can't see puts a
+   false fact straight into the context.
+
+3. **The embedder is lexical, and I shouldn't dress that up.** TF-IDF matches
+   words. The "semantic" cases (`retrieve-03`, `retrieve-04`) really pass
+   because the question shares words with the card: "screen", "case",
+   "draft". Ask "which flows are switched off?" and Retired_Cleanup doesn't
+   make the top six. A neural model would do better at genuine paraphrase. I picked TF-IDF for
+   reasons that matter here: CI downloads nothing, rankings are deterministic
+   enough to assert on in tier 1, and the retriever only sees an interface,
+   so `--embedder st` swaps in a sentence-transformer without touching
+   fusion. The small fixture also flatters pure vector. With "Lead.Score__c"
+   in the question, LeadService still ranks 6th of 11 on the word "lead"
+   alone. In a real org, with hundreds of cards saying "Lead", that match
+   would be worth nothing. So the bare "Score__c" wording is the one that
+   shows the gap cleanly.
+
+4. **RRF, because the scores aren't comparable.** A hop count and a cosine
+   similarity have no common unit, and any `0.7 * sim + 0.3 / hops` has
+   weights I'd be making up. Reciprocal Rank Fusion only looks at ranks.
+   What I didn't expect was its cost showing up in the mutation table.
+   `drop-apex-references` breaks `retrieve-05`: without its `triggers_on`
+   edge, LeadTrigger is still the #1 vector hit for "what runs when a Lead is
+   updated?", yet it drops out of the top 3. RRF ranks anything *both* paths
+   found above anything only one path found. On a small catalog nearly
+   everything is in both lists, so being found by one path alone is a big
+   handicap. Artifacts named in the question are pinned first, outside RRF.
+   Otherwise, consensus wins.
+
+5. **Object nodes are hubs, and hubs make graph walks useless.** Nearly
+   everything reads or writes Lead. Walk two hops through `object:Lead` and
+   every Lead artifact is "related" to every other. So objects are expanded
+   only when the question names them. Otherwise the walk can reach them but
+   not pass through them. Within a hop count, dependents (what breaks) rank
+   ahead of dependencies (what it uses), which rank ahead of mixed paths.
+
+The `graph-only-retrieval` mutation exists because an honest case could catch
+it: any question that describes behaviour without naming an artifact leaves
+the graph walk nothing to start from. What I haven't measured is retrieval
+quality on a real org. Eleven fixture artifacts prove each path contributes.
+They don't tell me how often either path is right on four thousand artifacts.
+
 ## Week 5 — evals, and the harness that caught itself
 
 The two-tier split is the whole argument, and it's also the answer to the

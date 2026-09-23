@@ -1,9 +1,10 @@
-"""Week 3 CLI: catalog, inspect, detect.
+"""Trowel CLI: catalog, inspect, detect, ask.
 
     python -m archaeologist.cli catalog fixtures/dig-site
     python -m archaeologist.cli stats
     python -m archaeologist.cli detect
     python -m archaeologist.cli impact field:Lead.Score__c
+    python -m archaeologist.cli ask "what depends on Score__c?"
 
 `detect` exits non-zero when it finds anything above 'info', so it can gate a
 deployment the same way a linter gates a pull request. A report nobody is
@@ -17,10 +18,12 @@ import sys
 from pathlib import Path
 
 from rich.console import Console
+from rich.markup import escape
 from rich.table import Table
 
 from . import catalog as catalog_mod
 from . import detectors, graph as graph_mod, parse
+from . import embed as embed_mod, retrieve as retrieve_mod
 
 DEFAULT_DB = Path("trowel.db")
 console = Console()
@@ -100,6 +103,47 @@ def cmd_impact(args) -> int:
     return 0
 
 
+def cmd_ask(args) -> int:
+    """Print the ranked context a model would be given, with provenance.
+
+    No model is called. The output is the retrieval step on its own, so a
+    reader can see *why* each artifact is there before anything is generated
+    from it.
+    """
+    artifacts, graph = _load_graph(Path(args.db))
+    if not artifacts:
+        console.print("[yellow]Catalog is empty. Run `catalog <dir>` first.[/yellow]")
+        return 1
+    try:
+        embedder = embed_mod.get(args.embedder)
+    except (ValueError, RuntimeError) as exc:
+        console.print(f"[red]{escape(str(exc))}[/red]")
+        return 2
+
+    retriever = retrieve_mod.Retriever(artifacts, graph, embedder, hops=args.hops)
+    named = retrieve_mod.detect_references(args.question, artifacts)
+    hits = retriever.retrieve(args.question, k=args.k)
+
+    console.print(f"[bold]Q:[/bold] {escape(args.question)}")
+    console.print(
+        "[dim]Named in question: "
+        + (", ".join(named) if named else "nothing in the catalog (vector path only)")
+        + f"  ·  embedder: {embedder.name}[/dim]\n"
+    )
+    if not hits:
+        console.print("[yellow]Nothing retrieved.[/yellow]")
+        return 0
+    colours = {"graph": "cyan", "vector": "magenta"}
+    for i, hit in enumerate(hits, start=1):
+        tags = " ".join(f"[{colours[s]}]{s}[/{colours[s]}]" for s in hit.sources)
+        console.print(f"{i:>2}. [bold]{hit.artifact_id}[/bold]  {tags}")
+        for reason in hit.reasons:
+            console.print(f"      · {escape(reason)}")
+        if args.cards:
+            console.print(f"      [dim]{escape(hit.card)}[/dim]")
+    return 0
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(prog="trowel", description=__doc__)
     parser.add_argument("--db", default=str(DEFAULT_DB), help="catalog path")
@@ -115,6 +159,16 @@ def main(argv: list[str] | None = None) -> int:
     p = sub.add_parser("impact", help="what breaks if this is deleted")
     p.add_argument("node", help="e.g. field:Lead.Score__c")
     p.set_defaults(func=cmd_impact)
+
+    p = sub.add_parser("ask", help="hybrid retrieval: ranked context with provenance")
+    p.add_argument("question", help='e.g. "what depends on Score__c?"')
+    p.add_argument("-k", type=int, default=8, help="how many results (default 8)")
+    p.add_argument("--hops", type=int, default=retrieve_mod.DEFAULT_HOPS,
+                   help="graph expansion depth (default 2)")
+    p.add_argument("--embedder", default="tfidf", choices=sorted(embed_mod.EMBEDDERS),
+                   help="tfidf (default, no dependencies) or st (sentence-transformers)")
+    p.add_argument("--cards", action="store_true", help="print each artifact's card too")
+    p.set_defaults(func=cmd_ask)
 
     args = parser.parse_args(argv)
     return args.func(args)

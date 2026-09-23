@@ -4,4 +4,12 @@
     <label>Apex Invoked Flow</label>
     <processType>AutoLaunchedFlow</processType>
     <status>Active</status>
+    <recordLookups>
+        <name>Get_Scored_Leads</name>
+        <object>Lead</object>
+        <filters>
+            <field>Score__c</field>
+            <operator>GreaterThan</operator>
+        </filters>
+    </recordLookups>
 </Flow>
